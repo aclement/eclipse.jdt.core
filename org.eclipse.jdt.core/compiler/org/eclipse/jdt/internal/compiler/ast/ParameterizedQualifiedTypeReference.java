@@ -14,6 +14,8 @@
  *     Stephan Herrmann - Contributions for
  *								bug 342671 - ClassCastException: org.eclipse.jdt.internal.compiler.lookup.SourceTypeBinding cannot be cast to org.eclipse.jdt.internal.compiler.lookup.ArrayBinding
  *								bug 392099 - [1.8][compiler][null] Apply null annotation on types for null analysis
+ *        Andy Clement - Contributions for
+ *                          Bug 383624 - [1.8][compiler] Revive code generation support for type annotations (from Olivier's work)
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
 
@@ -46,6 +48,18 @@ public class ParameterizedQualifiedTypeReference extends ArrayQualifiedTypeRefer
 		this.annotationsOnDimensions = annotationsOnDimensions;
 		if (annotationsOnDimensions != null) {
 			this.bits |= ASTNode.HasTypeAnnotations;
+		} else {
+			typeAnnoSearch:	for (int i = 0, max = typeArguments.length; i < max; i++) {
+				TypeReference[] typeArgumentsOnTypeComponent = typeArguments[i];
+				if (typeArgumentsOnTypeComponent!=null) {
+					for (int j = 0, max2 = typeArgumentsOnTypeComponent.length; j < max2; j++) {
+						if ((typeArgumentsOnTypeComponent[j].bits & ASTNode.HasTypeAnnotations)!=0) {
+							this.bits |= ASTNode.HasTypeAnnotations;
+							break typeAnnoSearch;
+						}
+					}
+				}
+			}
 		}
 	}
 	public void checkBounds(Scope scope) {

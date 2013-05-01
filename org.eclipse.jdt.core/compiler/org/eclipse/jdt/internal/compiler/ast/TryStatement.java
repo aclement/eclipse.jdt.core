@@ -5,6 +5,10 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  *
+ * This is an implementation of an early-draft specification developed under the Java
+ * Community Process (JCP) and is made available for testing and evaluation purposes
+ * only. The code is not compatible with any specification of the JCP.
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Stephan Herrmann - Contributions for
@@ -17,6 +21,8 @@
  *								bug 388996 - [compiler][resource] Incorrect 'potential resource leak'
  *								bug 401088 - [compiler][null] Wrong warning "Redundant null check" inside nested try statement
  *								bug 401092 - [compiler][null] Wrong warning "Redundant null check" in outer catch of nested try
+ *        Andy Clement - Contributions for
+ *                          Bug 383624 - [1.8][compiler] Revive code generation support for type annotations (from Olivier's work)
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
 
@@ -530,7 +536,7 @@ public void generateCode(BlockScope currentScope, CodeStream codeStream) {
 				multiCatchExceptionLabel.initialize((UnionTypeReference) argument.type);
 				exceptionLabel = multiCatchExceptionLabel;
 			} else {
-				exceptionLabel = new ExceptionLabel(codeStream, argument.binding.type);
+				exceptionLabel = new ExceptionLabel(codeStream, argument.binding.type, argument.type);
 			}
 			exceptionLabel.placeStart();
 			exceptionLabels[i] = exceptionLabel;

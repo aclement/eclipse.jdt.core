@@ -19,6 +19,8 @@
  *								bug 383368 - [compiler][null] syntactic null analysis for field references
  *								bug 401017 - [compiler][null] casted reference to @Nullable field lacks a warning
  *								bug 400761 - [compiler][null] null may be return as boolean without a diagnostic
+ *        Andy Clement - Contributions for
+ *                          Bug 383624 - [1.8][compiler] Revive code generation support for type annotations (from Olivier's work)
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.ast;
 
