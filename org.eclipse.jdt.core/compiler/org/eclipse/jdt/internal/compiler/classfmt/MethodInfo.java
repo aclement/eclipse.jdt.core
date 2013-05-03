@@ -1,13 +1,18 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2011, 2013 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  *
+ * This is an implementation of an early-draft specification developed under the Java
+ * Community Process (JCP) and is made available for testing and evaluation purposes
+ * only. The code is not compatible with any specification of the JCP.
+ *
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Stephan Herrmann - Contribution for bug 186342 - [compiler][null] Using annotations for null checking
+ *        Andy Clement - Contributions for Bug 407191 - [1.8] Binary access support for type annotations
  *******************************************************************************/
 package org.eclipse.jdt.internal.compiler.classfmt;
 
@@ -16,6 +21,7 @@ import org.eclipse.jdt.internal.compiler.codegen.AttributeNamesConstants;
 import org.eclipse.jdt.internal.compiler.codegen.ConstantPool;
 import org.eclipse.jdt.internal.compiler.env.IBinaryAnnotation;
 import org.eclipse.jdt.internal.compiler.env.IBinaryMethod;
+import org.eclipse.jdt.internal.compiler.env.IBinaryTypeAnnotation;
 import org.eclipse.jdt.internal.compiler.util.Util;
 
 public class MethodInfo extends ClassFileStruct implements IBinaryMethod, Comparable {
@@ -38,6 +44,7 @@ public static MethodInfo createMethod(byte classFileBytes[], int offsets[], int 
 	int readOffset = 8;
 	AnnotationInfo[] annotations = null;
 	AnnotationInfo[][] parameterAnnotations = null;
+	TypeAnnotationInfo[] typeAnnotations = null;
 	for (int i = 0; i < attributesCount; i++) {
 		// check the name of each attribute
 		int utf8Offset = methodInfo.constantPoolOffsets[methodInfo.u2At(readOffset)] - methodInfo.structOffset;
@@ -51,6 +58,7 @@ public static MethodInfo createMethod(byte classFileBytes[], int offsets[], int 
 				case 'R' :
 					AnnotationInfo[] methodAnnotations = null;
 					AnnotationInfo[][] paramAnnotations = null;
+					TypeAnnotationInfo[] methodTypeAnnotations = null;
 					if (CharOperation.equals(attributeName, AttributeNamesConstants.RuntimeVisibleAnnotationsName)) {
 						methodAnnotations = decodeMethodAnnotations(readOffset, true, methodInfo);
 					} else if (CharOperation.equals(attributeName, AttributeNamesConstants.RuntimeInvisibleAnnotationsName)) {
@@ -59,6 +67,10 @@ public static MethodInfo createMethod(byte classFileBytes[], int offsets[], int 
 						paramAnnotations = decodeParamAnnotations(readOffset, true, methodInfo);
 					} else if (CharOperation.equals(attributeName, AttributeNamesConstants.RuntimeInvisibleParameterAnnotationsName)) {
 						paramAnnotations = decodeParamAnnotations(readOffset, false, methodInfo);
+					} else if (CharOperation.equals(attributeName, AttributeNamesConstants.RuntimeVisibleTypeAnnotationsName)) {
+						methodTypeAnnotations = decodeTypeAnnotations(readOffset, true, methodInfo);
+					} else if (CharOperation.equals(attributeName, AttributeNamesConstants.RuntimeInvisibleTypeAnnotationsName)) {
+						methodTypeAnnotations = decodeTypeAnnotations(readOffset, false, methodInfo);
 					}
 					if (methodAnnotations != null) {
 						if (annotations == null) {
@@ -90,6 +102,16 @@ public static MethodInfo createMethod(byte classFileBytes[], int offsets[], int 
 								}
 							}
 						}
+					} else if (methodTypeAnnotations != null) {
+						if (typeAnnotations == null) {
+							typeAnnotations = methodTypeAnnotations;
+						} else {
+							int length = typeAnnotations.length;
+							TypeAnnotationInfo[] newAnnotations = new TypeAnnotationInfo[length + methodTypeAnnotations.length];
+							System.arraycopy(typeAnnotations, 0, newAnnotations, 0, length);
+							System.arraycopy(methodTypeAnnotations, 0, newAnnotations, length, methodTypeAnnotations.length);
+							typeAnnotations = newAnnotations;
+						}
 					}
 					break;
 			}
@@ -98,6 +120,8 @@ public static MethodInfo createMethod(byte classFileBytes[], int offsets[], int 
 	}
 	methodInfo.attributeBytes = readOffset;
 
+	if (typeAnnotations != null)
+		return new MethodInfoWithTypeAnnotations(methodInfo, annotations, parameterAnnotations, typeAnnotations);
 	if (parameterAnnotations != null)
 		return new MethodInfoWithParameterAnnotations(methodInfo, annotations, parameterAnnotations);
 	if (annotations != null)
@@ -143,6 +167,20 @@ static AnnotationInfo[] decodeMethodAnnotations(int offset, boolean runtimeVisib
 			}
 		}
 		return annos;
+	}
+	return null;
+}
+static TypeAnnotationInfo[] decodeTypeAnnotations(int offset, boolean runtimeVisible, MethodInfo methodInfo) {
+	int numberOfAnnotations = methodInfo.u2At(offset + 6);
+	if (numberOfAnnotations > 0) {
+		int readOffset = offset + 8;
+		TypeAnnotationInfo[] typeAnnos = new TypeAnnotationInfo[numberOfAnnotations];
+		for (int i = 0; i < numberOfAnnotations; i++) {
+			TypeAnnotationInfo newInfo = new TypeAnnotationInfo(methodInfo.reference, methodInfo.constantPoolOffsets, readOffset + methodInfo.structOffset, runtimeVisible, false);
+			readOffset += newInfo.readOffset;
+			typeAnnos[i] = newInfo;
+		}
+		return typeAnnos;
 	}
 	return null;
 }
@@ -273,6 +311,9 @@ public IBinaryAnnotation[] getParameterAnnotations(int index) {
 }
 public int getAnnotatedParametersCount() {
 	return 0;
+}
+public IBinaryTypeAnnotation[] getTypeAnnotations() {
+	return null;
 }
 /**
  * Answer the name of the method.

@@ -14,8 +14,7 @@
  *     Stephan Herrmann - Contributions for
  *								bug 186342 - [compiler][null] Using annotations for null checking
  *								bug 358903 - Filter practically unimportant resource leak warnings
- *        Andy Clement - Contributions for
- *                          Bug 383624 - [1.8][compiler] Revive code generation support for type annotations (from Olivier's work)
+ *        Andy Clement - Contributions for Bug 407191 - [1.8] Binary access support for type annotations
  *******************************************************************************/
 package org.eclipse.jdt.core.tests.compiler.regression;
 
@@ -214,6 +213,7 @@ public static Test suite() {
 		tests_1_8.addAll(since_1_6);
 		tests_1_8.addAll(since_1_7);
 		tests_1_8.addAll(since_1_8);
+		tests_1_8.add(ClassFileReaderTest_1_8.class);
 		// Reset forgotten subsets tests
 		TestCase.TESTS_PREFIX = null;
 		TestCase.TESTS_NAMES = null;
