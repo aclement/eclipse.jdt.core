@@ -127,12 +127,6 @@ public abstract class Annotation extends Expression {
 			public boolean visit(SingleTypeReference typeReference, BlockScope scope) {
 				if (!this.search) return false;
 
-				// depth allows for the syntax "outerInstance.new @A InnerType();"
-				int depth = 0;
-				if (typeReference.resolvedType instanceof ReferenceBinding) {
-					depth = getInnerDepth((ReferenceBinding)typeReference.resolvedType);
-				}
-				
 				if (dimensions != 0) {
 					for (int k = 0; k < dimensions; k++) {
 						this.typePathEntries.push(TYPE_PATH_ELEMENT_ARRAY);
@@ -147,6 +141,7 @@ public abstract class Annotation extends Expression {
 						if (current[j] == this.currentAnnotation) {
 							// Found
 							this.search = false;
+							int depth = getInnerDepth(typeReference.resolvedType);
 							if (depth != 0) {
 								for (int k = 0; k<depth; k++) {
 									this.typePathEntries.add(TYPE_PATH_INNER_TYPE);
@@ -228,21 +223,41 @@ public abstract class Annotation extends Expression {
 						}
 					}
 				}
-				Annotation[][] annotations = typeReference.annotations;
-				if (annotations == null) {
-					annotations = new Annotation[][] { primaryAnnotation };
-				}
-				int annotationsLevels = annotations.length;
-				for (int i = 0; i < annotationsLevels; i++) {
-					Annotation [] current = annotations[i];
-					int annotationsLength = current == null ? 0 : current.length;
-					for (int j = 0; j < annotationsLength; j++) {
-						if (current[j] == this.currentAnnotation) {
+				
+				if (primaryAnnotation != null) {
+					for (int i = 0, max = primaryAnnotation.length; i < max; i++) {
+						if (primaryAnnotation[i] == this.currentAnnotation) {
 							this.search = false;
-							for (int k = 0, maxk=typeReference.dimensions; k < maxk; k++) {
+							for (int k = 0, maxk = typeReference.dimensions; k < maxk; k++) {
 								this.typePathEntries.push(TYPE_PATH_ELEMENT_ARRAY);
-							}
+							}		
 							return false;
+						}
+					}
+				}
+				
+				Annotation[][] annotations = typeReference.annotations;
+				if (annotations != null) {
+					int annotationsLevels = annotations.length;
+					for (int i = 0; i < annotationsLevels; i++) {
+						Annotation [] current = annotations[i];
+						int annotationsLength = current == null ? 0 : current.length;
+						for (int j = 0; j < annotationsLength; j++) {
+							if (current[j] == this.currentAnnotation) {
+								this.search = false;
+								for (int k = 0, maxk = typeReference.dimensions; k < maxk; k++) {
+									this.typePathEntries.push(TYPE_PATH_ELEMENT_ARRAY);
+								}
+								// depth allows for references like: one.two.three.@B Foo[]
+								// the inner_type elements to the type path depend on the types not the package qualifiers
+								int depth = getInnerDepth(typeReference.resolvedType);
+								if (depth != 0) {
+									for (int k = 0; k < depth; k++) {
+										this.typePathEntries.push(TYPE_PATH_INNER_TYPE);
+									}
+								}
+								return false;
+							}
 						}
 					}
 				}
@@ -364,9 +379,17 @@ public abstract class Annotation extends Expression {
 				return needsInnerEntryInfo;
 			}
 			
-			private int getInnerDepth(ReferenceBinding resolvedType) {
+			private int getInnerDepth(TypeBinding resolvedType) {
+				ReferenceBinding type = null;
+				if (resolvedType instanceof ReferenceBinding) {
+					type = (ReferenceBinding)resolvedType;
+				} else if (resolvedType instanceof ArrayBinding) {
+					TypeBinding leafComponentType = ((ArrayBinding)resolvedType).leafComponentType;
+					if (leafComponentType instanceof ReferenceBinding) {
+						type = (ReferenceBinding)leafComponentType;
+					}
+				}
 				int depth = 0;
-				ReferenceBinding type = resolvedType;
 				while (type != null) {
 					depth += (type.isStatic())?0:1;
 					type = type.enclosingType();
