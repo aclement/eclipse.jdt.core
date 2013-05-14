@@ -19,6 +19,7 @@ import org.eclipse.jdt.internal.compiler.env.IBinaryField;
 import org.eclipse.jdt.internal.compiler.env.IBinaryMethod;
 import org.eclipse.jdt.internal.compiler.env.IBinaryNestedType;
 import org.eclipse.jdt.internal.compiler.env.IBinaryType;
+import org.eclipse.jdt.internal.compiler.env.IBinaryTypeAnnotation;
 import org.eclipse.jdt.internal.core.search.indexing.IIndexConstants;
 
 public class HierarchyBinaryType implements IBinaryType {
@@ -51,6 +52,14 @@ public HierarchyBinaryType(int modifiers, char[] qualification, char[] sourceNam
 public IBinaryAnnotation[] getAnnotations() {
 	return null;
 }
+
+/**
+ * @see org.eclipse.jdt.internal.compiler.env.IBinaryType
+ */
+public IBinaryTypeAnnotation[] getTypeAnnotations() {
+	return null;
+}
+
 public char[] getEnclosingMethod() {
 	return null;
 }

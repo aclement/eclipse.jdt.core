@@ -28,6 +28,7 @@ import java.util.ArrayList;
 
 import org.eclipse.jdt.core.compiler.CharOperation;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
+import org.eclipse.jdt.internal.compiler.codegen.AnnotationTargetTypeConstants;
 import org.eclipse.jdt.internal.compiler.env.*;
 import org.eclipse.jdt.internal.compiler.impl.BooleanConstant;
 import org.eclipse.jdt.internal.compiler.impl.Constant;
@@ -61,6 +62,8 @@ public class BinaryTypeBinding extends ReferenceBinding {
 	protected LookupEnvironment environment;
 
 	protected SimpleLookupTable storedAnnotations = null; // keys are this ReferenceBinding & its fields and methods, value is an AnnotationHolder
+	
+	protected SimpleLookupTable storedTypeAnnotations = null; // keys are this ReferenceBinding & its fields and methods, value is a TypeAnnotationHolder
 
 static Object convertMemberValue(Object binaryValue, LookupEnvironment env, char[][][] missingTypeNames) {
 	if (binaryValue == null) return null;
@@ -102,6 +105,15 @@ static AnnotationBinding createAnnotation(IBinaryAnnotation annotationInfo, Look
 	return new UnresolvedAnnotationBinding(annotationType, pairs, env);
 }
 
+static TypeAnnotationBinding createTypeAnnotation(IBinaryTypeAnnotation typeAnnotationInfo, LookupEnvironment env, char[][][] missingTypeNames) {
+	int targetType = typeAnnotationInfo.getTargetType();
+	int[] typePath = typeAnnotationInfo.getTypePath();
+	IBinaryAnnotation annotationInfo = typeAnnotationInfo.getAnnotation();
+	int info1 = typeAnnotationInfo.getSupertypeIndex(); 
+	int info2 = typeAnnotationInfo.getBoundIndex(); 
+	return new TypeAnnotationBinding(targetType, typePath, info1, info2, createAnnotation(annotationInfo, env, missingTypeNames));
+} 
+
 public static AnnotationBinding[] createAnnotations(IBinaryAnnotation[] annotationInfos, LookupEnvironment env, char[][][] missingTypeNames) {
 	int length = annotationInfos == null ? 0 : annotationInfos.length;
 	AnnotationBinding[] result = length == 0 ? Binding.NO_ANNOTATIONS : new AnnotationBinding[length];
@@ -109,6 +121,15 @@ public static AnnotationBinding[] createAnnotations(IBinaryAnnotation[] annotati
 		result[i] = createAnnotation(annotationInfos[i], env, missingTypeNames);
 	return result;
 }
+
+public static TypeAnnotationBinding[] createTypeAnnotations(IBinaryTypeAnnotation[] typeAnnotationInfos, LookupEnvironment env, char[][][] missingTypeNames) {
+	int length = typeAnnotationInfos == null ? 0 : typeAnnotationInfos.length;
+	TypeAnnotationBinding[] result = length == 0 ? Binding.NO_TYPE_ANNOTATIONS : new TypeAnnotationBinding[length];
+	for (int i = 0; i < length; i++)
+		result[i] = createTypeAnnotation(typeAnnotationInfos[i], env, missingTypeNames);
+	return result;
+}
+
 
 public static TypeBinding resolveType(TypeBinding type, LookupEnvironment environment, boolean convertGenericToRawType) {
 	switch (type.kind()) {
@@ -324,7 +345,7 @@ void cachePartsFrom(IBinaryType binaryType, boolean needFieldsAndMethods) {
 			if (wrapper.signature[wrapper.start] == Util.C_GENERIC_START) {
 				// ParameterPart = '<' ParameterSignature(s) '>'
 				wrapper.start++; // skip '<'
-				this.typeVariables = createTypeVariables(wrapper, true, missingTypeNames);
+				this.typeVariables = createTypeVariables(wrapper, true, missingTypeNames, binaryType.getTypeAnnotations());
 				wrapper.start++; // skip '>'
 				this.tagBits |=  TagBits.HasUnresolvedTypeVariables;
 				this.modifiers |= ExtraCompilerModifiers.AccGenericSignature;
@@ -396,8 +417,10 @@ void cachePartsFrom(IBinaryType binaryType, boolean needFieldsAndMethods) {
 				}
 			}
 		}
-		if (this.environment.globalOptions.storeAnnotations)
+		if (this.environment.globalOptions.storeAnnotations) {
 			setAnnotations(createAnnotations(binaryType.getAnnotations(), this.environment, missingTypeNames));
+			setTypeAnnotations(createTypeAnnotations(binaryType.getTypeAnnotations(), this.environment, missingTypeNames));
+		}
 	} finally {
 		// protect against incorrect use of the needFieldsAndMethods flag, see 48459
 		if (this.fields == null)
@@ -435,6 +458,8 @@ private void createFields(IBinaryField[] iFields, long sourceLevel, char[][][] m
 					firstAnnotatedFieldIndex = i;
 				}
 				field.id = i; // ordinal
+				// TODO [ASC] check on store annotations 
+				field.setTypeAnnotations(createTypeAnnotations(binaryField.getTypeAnnotations(),this.environment,missingTypeNames));
 				if (use15specifics)
 					field.tagBits |= binaryField.getTagBits();
 				if (hasRestrictedAccess)
@@ -552,7 +577,7 @@ private MethodBinding createMethod(IBinaryMethod method, long sourceLevel, char[
 			// <A::Ljava/lang/annotation/Annotation;>(Ljava/lang/Class<TA;>;)TA;
 			// ParameterPart = '<' ParameterSignature(s) '>'
 			wrapper.start++; // skip '<'
-			typeVars = createTypeVariables(wrapper, false, missingTypeNames);
+			typeVars = createTypeVariables(wrapper, false, missingTypeNames, method.getTypeAnnotations());
 			wrapper.start++; // skip '>'
 		}
 
@@ -677,7 +702,7 @@ private void createMethods(IBinaryMethod[] iMethods, long sourceLevel, char[][][
 	}
 }
 
-private TypeVariableBinding[] createTypeVariables(SignatureWrapper wrapper, boolean assignVariables, char[][][] missingTypeNames) {
+private TypeVariableBinding[] createTypeVariables(SignatureWrapper wrapper, boolean assignVariables, char[][][] missingTypeNames, IBinaryTypeAnnotation[] typeAnnotations) {
 	// detect all type variables first
 	char[] typeSignature = wrapper.signature;
 	int depth = 0, length = typeSignature.length;
@@ -704,7 +729,8 @@ private TypeVariableBinding[] createTypeVariables(SignatureWrapper wrapper, bool
 						pendingVariable = false;
 						int colon = CharOperation.indexOf(Util.C_COLON, typeSignature, i);
 						char[] variableName = CharOperation.subarray(typeSignature, i, colon);
-						variables.add(new TypeVariableBinding(variableName, this, rank++, this.environment));
+						AnnotationBinding[] typeAnnotationsOnThisTypeVariable = retrieveTypeAnnotationsOnClassTypeParameters(typeAnnotations,rank,missingTypeNames);
+						variables.add(new TypeVariableBinding(variableName, this, rank++, this.environment, typeAnnotationsOnThisTypeVariable));
 					}
 			}
 		}
@@ -720,6 +746,31 @@ private TypeVariableBinding[] createTypeVariables(SignatureWrapper wrapper, bool
 		initializeTypeVariable(result[i], result, wrapper, missingTypeNames);
 	}
 	return result;
+}
+
+private AnnotationBinding[] retrieveTypeAnnotationsOnClassTypeParameters(IBinaryTypeAnnotation[] typeAnnotations,
+		int rank,  char[][][] missingTypeNames) {
+	if (typeAnnotations==null) {
+		return null;
+	}
+	IBinaryAnnotation[] annotationInfos = null;
+	for (int i = 0, max = typeAnnotations.length; i < max; i++) {
+		IBinaryTypeAnnotation typeAnnotation = typeAnnotations[i];
+		if (typeAnnotation.getTargetType() == AnnotationTargetTypeConstants.CLASS_TYPE_PARAMETER && typeAnnotation.getTypeParameterIndex() == rank) {
+			int[] typepath = typeAnnotation.getTypePath();
+			if (typepath.length==0) { // can it be other than 0?
+				if (annotationInfos == null) {
+					annotationInfos = new IBinaryAnnotation[]{typeAnnotation.getAnnotation()};
+				} else {
+					IBinaryAnnotation[] newAnnotationInfos = new IBinaryAnnotation[annotationInfos.length+1];
+					System.arraycopy(annotationInfos,0,newAnnotationInfos,1,annotationInfos.length);
+					newAnnotationInfos[0]=typeAnnotation.getAnnotation();
+					annotationInfos = newAnnotationInfos;
+				}
+			}
+		}
+	}
+	return annotationInfos==null ? null : createAnnotations(annotationInfos, this.environment, missingTypeNames);
 }
 
 /* Answer the receiver's enclosing type... null if the receiver is a top level type.
@@ -1165,6 +1216,10 @@ MethodBinding resolveTypesFor(MethodBinding method) {
 AnnotationBinding[] retrieveAnnotations(Binding binding) {
 	return AnnotationBinding.addStandardAnnotations(super.retrieveAnnotations(binding), binding.getAnnotationTagBits(), this.environment);
 }
+
+//TypeAnnotationBinding[] retrieveTypeAnnotations(Binding binding) {
+//	return super.retrieveTypeAnnotations(binding);
+//}
 SimpleLookupTable storedAnnotations(boolean forceInitialize) {
 	if (forceInitialize && this.storedAnnotations == null) {
 		if (!this.environment.globalOptions.storeAnnotations)
@@ -1172,6 +1227,15 @@ SimpleLookupTable storedAnnotations(boolean forceInitialize) {
 		this.storedAnnotations = new SimpleLookupTable(3);
 	}
 	return this.storedAnnotations;
+}
+
+SimpleLookupTable storedTypeAnnotations(boolean forceInitialize) {
+	if (forceInitialize && this.storedTypeAnnotations == null) {
+		if (!this.environment.globalOptions.storeAnnotations)
+			return null; // not supported during this compile
+		this.storedTypeAnnotations = new SimpleLookupTable(3);
+	}
+	return this.storedTypeAnnotations;
 }
 
 void scanFieldForNullAnnotation(IBinaryField field, FieldBinding fieldBinding) {

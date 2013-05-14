@@ -383,6 +383,9 @@ public FieldBinding original() {
 public void setAnnotations(AnnotationBinding[] annotations) {
 	this.declaringClass.storeAnnotations(this, annotations);
 }
+public void setTypeAnnotations(TypeAnnotationBinding[] typeAnnotations) {
+	this.declaringClass.storeTypeAnnotations(this, typeAnnotations);
+}
 public FieldDeclaration sourceField() {
 	SourceTypeBinding sourceType;
 	try {
@@ -398,5 +401,17 @@ public FieldDeclaration sourceField() {
 				return fields[i];
 	}
 	return null;
+}
+public AnnotatedTypeCarrier getAnnotatedTypeCarrier() {
+	// 1. fetch type annotations
+	// TODO should be using original field here??
+	FieldBinding originalField = original();
+	ReferenceBinding declaringClassBinding = originalField.declaringClass;
+	if (declaringClassBinding == null) {
+		return null;
+	}
+	TypeAnnotationBinding[] typeAnnotationBindings = declaringClassBinding.retrieveTypeAnnotations(originalField);
+	// 2. return the carrier
+	return AnnotatedTypeCarrier.getAnnotatedTypeCarrier(this.type, typeAnnotationBindings);
 }
 }

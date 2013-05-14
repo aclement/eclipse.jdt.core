@@ -17,9 +17,23 @@
 package org.eclipse.jdt.core.tests.compiler.regression;
 
 import java.io.File;
+import java.util.Locale;
 import java.util.Map;
+
+import org.eclipse.jdt.core.tests.util.Util;
 import org.eclipse.jdt.core.util.ClassFileBytesDisassembler;
+import org.eclipse.jdt.internal.compiler.Compiler;
+import org.eclipse.jdt.internal.compiler.IErrorHandlingPolicy;
+import org.eclipse.jdt.internal.compiler.IProblemFactory;
+import org.eclipse.jdt.internal.compiler.batch.CompilationUnit;
+import org.eclipse.jdt.internal.compiler.batch.FileSystem;
+import org.eclipse.jdt.internal.compiler.env.ICompilationUnit;
+import org.eclipse.jdt.internal.compiler.env.INameEnvironment;
 import org.eclipse.jdt.internal.compiler.impl.CompilerOptions;
+import org.eclipse.jdt.internal.compiler.lookup.AnnotationBinding;
+import org.eclipse.jdt.internal.compiler.lookup.ReferenceBinding;
+import org.eclipse.jdt.internal.compiler.lookup.TypeVariableBinding;
+import org.eclipse.jdt.internal.compiler.problem.DefaultProblemFactory;
 
 import junit.framework.Test;
 
@@ -1727,6 +1741,130 @@ public class TypeAnnotationTest extends AbstractRegressionTest {
 			"        target type = 0x14 METHOD_RETURN\n" + 
 			"      )\n";
 		checkDisassembledClassFile(OUTPUT_DIR + File.separator + "X.class", "X", expectedOutput, ClassFileBytesDisassembler.SYSTEM);
+	}
+	
+	public void test042_bindings() throws Exception {
+
+		// Build some helper code
+		this.runConformTest(
+			new String[] {
+				"A.java",
+				"import java.lang.annotation.*;\n" + 
+				"@Target(ElementType.TYPE_USE)\n" + 
+				"@Retention(RetentionPolicy.RUNTIME)\n" + 
+				"@interface A {\n" + 
+				"	String value() default \"default\";\n" + 
+				"}\n",
+				"B.java",
+				"import java.lang.annotation.*;\n" + 
+				"@Target(ElementType.TYPE_USE)\n" + 
+				"@Retention(RetentionPolicy.CLASS)\n" + 
+				"@interface B {\n" + 
+				"	int value() default -1;\n" + 
+				"}",
+				"X.java",
+				"public class X<@A T1> {\n" +
+				"}",
+		},
+		"");
+		
+		
+		String[] jcl = Util.getJavaClassLibs();
+		String[] jcl2 = new String[jcl.length+1];
+		System.arraycopy(jcl,0,jcl2,1,jcl.length);
+		jcl2[0]=OUTPUT_DIR;
+		INameEnvironment nameEnvironment = new FileSystem(jcl2, new String[] {}, null);
+		IErrorHandlingPolicy errorHandlingPolicy = new IErrorHandlingPolicy() {
+			public boolean proceedOnErrors() { return true; }
+			public boolean stopOnFirstError() { return false; }
+			public boolean ignoreAllErrors() { return false; }
+		};
+		Map options = getCompilerOptions();
+		options.put(CompilerOptions.OPTION_Process_Annotations, CompilerOptions.ENABLED);
+		CompilerOptions compilerOptions = new CompilerOptions(options);
+		compilerOptions.performMethodsFullRecovery = false;
+		compilerOptions.performStatementsRecovery = false;
+		Requestor requestor = new Requestor(false, null /*no custom requestor*/, false, /* show category */ false /* show warning token*/);
+		requestor.outputPath = "bin/";
+		IProblemFactory problemFactory = new DefaultProblemFactory(Locale.getDefault());
+
+		Compiler compiler = new Compiler(nameEnvironment, errorHandlingPolicy, compilerOptions, requestor, problemFactory);
+		compiler.options.produceReferenceInfo = true;
+
+		String code = "@javax.xml.bind.annotation.XmlSchema(namespace = \"test\")\npackage testpack;\n";
+		ICompilationUnit source = new CompilationUnit(code.toCharArray(), "testpack/package-info.java", null);
+
+		String code2 = "class Foo<@A T1> {}\n";
+		ICompilationUnit source2 = new CompilationUnit(code2.toCharArray(), "Foo.java", null);
+
+		// don't call compile as would be normally expected since that wipes out the lookup environment
+		// before we could query it. Use internal API resolve instead which can run a subset of the
+		// compilation steps for us.
+		compiler.resolve (source,
+			true, // verifyMethods,
+			true, // boolean analyzeCode,
+			false // generateCode
+		);
+		
+		compiler.resolve (source2,
+				true, // verifyMethods,
+				true, // boolean analyzeCode,
+				false // generateCode
+			);
+		
+//		char [][] compoundName = new char [][] { "testpack".toCharArray(), "package-info".toCharArray()};
+		char [][] compoundName2 = new char [][] { "Foo".toCharArray()};
+//		ReferenceBinding type = compiler.lookupEnvironment.getType(compoundName);
+		ReferenceBinding type2 = compiler.lookupEnvironment.getType(compoundName2);
+System.out.println(type2.getClass());
+
+		assertEquals("org.eclipse.jdt.internal.compiler.lookup.SourceTypeBinding",type2.getClass().getName());
+		TypeVariableBinding tvb1 = type2.getTypeVariable("T1".toCharArray());
+		System.out.println(tvb1);
+		System.out.println(tvb1.getTypeAnnotations()); // TODO should be called getAnnotations
+		assertNotNull(tvb1.getTypeAnnotations());
+		assertEquals("@A",tvb1.getTypeAnnotations()[0]);
+		
+		// Verify the structure of X
+		char [][] charNameForX = new char [][] { "X".toCharArray()};
+		ReferenceBinding type3 = compiler.lookupEnvironment.getType(charNameForX);
+		assertEquals("org.eclipse.jdt.internal.compiler.lookup.BinaryTypeBinding",type3.getClass().getName());
+		TypeVariableBinding tvb = type3.getTypeVariable("T1".toCharArray());
+		System.out.println(tvb);
+		AnnotationBinding[] ab = tvb.getTypeAnnotations();
+		assertEquals(1,ab.length);
+		assertEquals("@A",ab[0].toString());
+		
+		
+//		AnnotationBinding[] annotations = null;
+//		if (type != null && type.isValidBinding()) {
+//			annotations = type.getAnnotations();
+//		}
+//		assertTrue ("Annotations missing on package-info interface", annotations != null && annotations.length == 1);
+//		assertEquals("Wrong annotation on package-info interface ", "@XmlSchema{ namespace = (String)\"test\"}", annotations[0].toString());
+		nameEnvironment.cleanup();
+		if (requestor.hasErrors)
+			System.err.print(requestor.problemLog); // problem log empty if no problems
+		compiler = null;
+//		"");
+//		// javac-b81:
+//		// Bytes:13[0 1 20 0 0 11 0 1 0 12 115 0 13]
+//		// Bytes:13[0 1 20 0 0 15 0 1 0 12 73 0 16]
+//		String expectedOutput =
+//			"    RuntimeVisibleTypeAnnotations: \n" + 
+//			"      #21 @A(\n" + 
+//			"        #18 value=\"test\" (constant type)\n" + 
+//			"        target type = 0x14 METHOD_RETURN\n" + 
+//			"      )\n" + 
+//			"    RuntimeInvisibleTypeAnnotations: \n" + 
+//			"      #17 @B(\n" + 
+//			"        #18 value=(int) 3 (constant type)\n" + 
+//			"        target type = 0x14 METHOD_RETURN\n" + 
+//			"      )\n";
+//		checkDisassembledClassFile(OUTPUT_DIR + File.separator + "X.class", "X", expectedOutput, ClassFileBytesDisassembler.SYSTEM);
+//		
+//		FileSystem fs = new FileSystem();
+//		LookupEnvironment le = new LookupEnvironment(new MyTypeRequestor(), new CompilerOptions(), new MyProblemReporter(), new MyNameEnvironment())
 	}
 	
 	public void test043_methodReceiver() throws Exception {

@@ -17,6 +17,7 @@ import java.util.Map;
 import junit.framework.Test;
 
 import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
 
 // see bug 186342 - [compiler][null] Using annotations for null checking
 public class NullAnnotationTest extends AbstractNullAnnotationTest {
@@ -1321,6 +1322,36 @@ public void test_nullable_return_001() {
 			"import org.eclipse.jdt.annotation.*;\n" +
 			"public class X {\n" +
 			"    @Nullable Object getObject() { return null; }\n" +
+			"    void foo() {\n" +
+			"        Object o = getObject();\n" +
+			"        System.out.print(o.toString());\n" +
+			"    }\n" +
+			"}\n"
+		},
+		"----------\n" +
+		"1. ERROR in X.java (at line 6)\n" +
+		"	System.out.print(o.toString());\n" +
+		"	                 ^\n" +
+		"Potential null pointer access: The variable o may be null at this location\n" +
+		"----------\n");
+}
+
+// Needed to run tests individually from JUnit
+protected void setUp() throws Exception {
+	super.setUp();
+	this.complianceLevel = ClassFileConstants.JDK1_8;
+}
+
+
+public void test_nullable_return_001_andy() {
+	runNegativeTestWithLibs(
+		new String[] {
+			"X.java",
+		"import java.lang.annotation.*;\n" +
+			"import org.eclipse.jdt.annotation.*;\n" +
+		"@Retention(RetentionPolicy.RUNTIME) @Target(ElementType.TYPE_USE) @interface Marker {}\n" +
+			"public class X {\n" +
+			"    @Nullable @Marker Object getObject() { return null; }\n" +
 			"    void foo() {\n" +
 			"        Object o = getObject();\n" +
 			"        System.out.print(o.toString());\n" +

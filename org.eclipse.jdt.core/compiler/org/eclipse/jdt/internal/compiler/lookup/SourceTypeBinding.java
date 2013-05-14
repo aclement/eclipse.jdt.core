@@ -1717,6 +1717,11 @@ public MethodBinding resolveTypesFor(MethodBinding method) {
 		return method; // but its still unresolved with a null return type & is still connected to its method declaration
 
 	method.modifiers &= ~ExtraCompilerModifiers.AccUnresolved;
+	// CUSTARD
+	Object o = method.returnType;
+	AnnotatedTypeCarrier atc = method.getTypeAnnotationsOnReturnType();
+	System.out.println(atc);
+
 	return method;
 }
 // https://bugs.eclipse.org/bugs/show_bug.cgi?id=391108

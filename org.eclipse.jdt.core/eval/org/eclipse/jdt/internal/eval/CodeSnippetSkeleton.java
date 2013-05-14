@@ -190,4 +190,8 @@ public boolean isMember() {
 public char[] sourceFileName() {
 	return null;
 }
+public IBinaryTypeAnnotation[] getTypeAnnotations() {
+	// TODO Auto-generated method stub
+	return null;
+}
 }

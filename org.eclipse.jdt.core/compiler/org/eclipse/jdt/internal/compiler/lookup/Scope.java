@@ -832,7 +832,7 @@ public abstract class Scope {
 		int count = 0;
 		for (int i = 0; i < length; i++) {
 			TypeParameter typeParameter = typeParameters[i];
-			TypeVariableBinding parameterBinding = new TypeVariableBinding(typeParameter.name, declaringElement, i, environment());
+			TypeVariableBinding parameterBinding = new TypeVariableBinding(typeParameter.name, declaringElement, i, environment(), null);//createTypeAnnotationBindings(typeParameter.annotations));
 			parameterBinding.fPackage = unitPackage;
 			typeParameter.binding = parameterBinding;
 
@@ -883,6 +883,25 @@ public abstract class Scope {
 		if (count != length)
 			System.arraycopy(typeVariableBindings, 0, typeVariableBindings = new TypeVariableBinding[count], 0, count);
 		return typeVariableBindings;
+	}
+
+	private AnnotationBinding[] createTypeAnnotationBindings(Annotation[] annotations) {
+		if (annotations == null) {
+			return null;
+		}
+		AnnotationBinding[] annotationBindings = new AnnotationBinding[annotations.length];
+		for (int i = 0, max = annotations.length; i < max; i++) {
+			Annotation annotation = annotations[i];
+			annotation.resolveType((ClassScope)this);
+			// annotation.resolvedType; // assert not null
+			MemberValuePair[] mvps = annotation.memberValuePairs();
+			ElementValuePair[] pairs = mvps.length == 0 ? Binding.NO_ELEMENT_VALUE_PAIRS : new ElementValuePair[mvps.length];
+			for (int j = 0, max2 = mvps.length; j < max2; j++) {
+				pairs[i] = new ElementValuePair(mvps[j].name,mvps[j].value,mvps[j].binding);
+			}
+			annotationBindings[i] = new AnnotationBinding((ReferenceBinding)annotation.resolvedType,pairs);
+		}
+		return annotationBindings;
 	}
 
 	public final ClassScope enclosingClassScope() {

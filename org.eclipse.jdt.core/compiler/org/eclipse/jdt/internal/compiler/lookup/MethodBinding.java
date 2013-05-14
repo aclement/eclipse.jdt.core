@@ -574,6 +574,34 @@ public AnnotationBinding[] getAnnotations() {
 	return originalMethod.declaringClass.retrieveAnnotations(originalMethod);
 }
 
+public TypeAnnotationBinding[] getTypeAnnotations() {
+	MethodBinding originalMethod = original();
+	return originalMethod.declaringClass.retrieveTypeAnnotations(originalMethod);
+}
+
+public AnnotatedTypeCarrier getTypeAnnotationsOnReturnType() {
+	MethodBinding originalMethod = original();
+	TypeAnnotationHolder typeAnnotationHolder = originalMethod.declaringClass.retrieveTypeAnnotationHolder(this, true);	
+	if (typeAnnotationHolder == null) {
+		// Compute it
+		
+		return null;
+	}
+	TypeAnnotationBinding[] typeAnnotationsOnReturnType = typeAnnotationHolder.getTypeAnnotationsOnReturnType();
+	return AnnotatedTypeCarrier.getAnnotatedTypeCarrier(this.returnType,typeAnnotationsOnReturnType);
+}
+
+static class TypeAnnotationAnswer {
+	public TypeAnnotationAnswer(TypeBinding type2, AnnotationBinding[] relevantAnnotations,
+			AnnotationBinding[] remainingTypeAnnotations) {
+		this.type = type2;
+		this.annotations = relevantAnnotations;
+	}
+	TypeBinding type;
+	AnnotationBinding[] annotations;
+	AnnotatedTypeCarrier context;
+}
+
 /**
  * Compute the tagbits for standard annotations. For source types, these could require
  * lazily resolving corresponding annotation nodes, in case of forward references.

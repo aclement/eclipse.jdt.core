@@ -23,6 +23,13 @@ public interface IBinaryType extends IGenericType {
  */
 
 IBinaryAnnotation[] getAnnotations();
+
+/**
+ * Answer the runtime visible and invisible type annotations for this type or null if none.
+ */
+
+public IBinaryTypeAnnotation[] getTypeAnnotations();
+
 /**
  * Answer the enclosing method (including method selector and method descriptor), or
  * null if none.

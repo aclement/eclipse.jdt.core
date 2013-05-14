@@ -1512,13 +1512,27 @@ public AnnotationHolder retrieveAnnotationHolder(Binding binding, boolean forceI
 	return store == null ? null : (AnnotationHolder) store.get(binding);
 }
 
+public TypeAnnotationHolder retrieveTypeAnnotationHolder(Binding binding, boolean forceInitialization) {
+	SimpleLookupTable store = storedTypeAnnotations(forceInitialization);
+	return store == null ? null : (TypeAnnotationHolder) store.get(binding);
+}
+
 AnnotationBinding[] retrieveAnnotations(Binding binding) {
 	AnnotationHolder holder = retrieveAnnotationHolder(binding, true);
 	return holder == null ? Binding.NO_ANNOTATIONS : holder.getAnnotations();
 }
 
+TypeAnnotationBinding[] retrieveTypeAnnotations(Binding binding) {
+	TypeAnnotationHolder holder  = retrieveTypeAnnotationHolder(binding, true);
+	return holder == null ? Binding.NO_TYPE_ANNOTATIONS : holder.getTypeAnnotations();
+}
+
 public void setAnnotations(AnnotationBinding[] annotations) {
 	storeAnnotations(this, annotations);
+}
+
+public void setTypeAnnotations(TypeAnnotationBinding[] annotations) {
+	storeTypeAnnotations(this, annotations);
 }
 
 public char[] shortReadableName() /*Object*/ {
@@ -1567,6 +1581,18 @@ void storeAnnotationHolder(Binding binding, AnnotationHolder holder) {
 	}
 }
 
+void storeTypeAnnotationHolder(Binding binding, TypeAnnotationHolder holder) {
+	if (holder == null) {
+		SimpleLookupTable store = storedTypeAnnotations(false);
+		if (store != null)
+			store.removeKey(binding);
+	} else {
+		SimpleLookupTable store = storedTypeAnnotations(true);
+		if (store != null)
+			store.put(binding, holder);
+	}
+}
+
 void storeAnnotations(Binding binding, AnnotationBinding[] annotations) {
 	AnnotationHolder holder = null;
 	if (annotations == null || annotations.length == 0) {
@@ -1584,8 +1610,30 @@ void storeAnnotations(Binding binding, AnnotationBinding[] annotations) {
 	storeAnnotationHolder(binding, holder.setAnnotations(annotations));
 }
 
+void storeTypeAnnotations(Binding binding, TypeAnnotationBinding[] typeAnnotations) {
+	TypeAnnotationHolder holder = null;
+	if (typeAnnotations == null || typeAnnotations.length == 0) {
+		SimpleLookupTable store = storedTypeAnnotations(false);
+		if (store != null)
+			holder = (TypeAnnotationHolder) store.get(binding);
+		if (holder == null) return; // nothing to delete
+	} else {
+		SimpleLookupTable store = storedTypeAnnotations(true);
+		if (store == null) return; // not supported
+		holder = (TypeAnnotationHolder) store.get(binding);
+		if (holder == null)
+			holder = new TypeAnnotationHolder();
+	}
+	storeTypeAnnotationHolder(binding, holder.setTypeAnnotations(typeAnnotations));
+}
+
+
 SimpleLookupTable storedAnnotations(boolean forceInitialize) {
-	return null; // overrride if interested in storing annotations for the receiver, its fields and methods
+	return null; // override if interested in storing annotations for the receiver, its fields and methods
+}
+
+SimpleLookupTable storedTypeAnnotations(boolean forceInitialize) {
+	return null; // override if interested in storing type annotations for the receiver, its fields and methods
 }
 
 public ReferenceBinding superclass() {

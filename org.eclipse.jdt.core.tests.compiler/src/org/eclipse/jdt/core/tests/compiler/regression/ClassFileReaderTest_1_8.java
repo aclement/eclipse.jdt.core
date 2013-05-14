@@ -361,6 +361,43 @@ public class ClassFileReaderTest_1_8 extends AbstractRegressionTest {
 		assertEquals("@LFoo; THROWS(throws_type_index=0)",printTypeAnnotation(typeAnnotations[0]));
 		assertEquals("@LBar;(value=(int)1) THROWS(throws_type_index=1)",printTypeAnnotation(typeAnnotations[1]));
 	}
+	
+//	public void test012_differenceTesting_classTypeParameter() throws Exception {
+//		String sourceOriginal =
+//			"import java.lang.annotation.*;\n" +
+//			"public class X<@Foo T1,@Bar(iii=99) T2> {}\n" +
+//			"@Retention(RetentionPolicy.CLASS)\n" +
+//			"@Target(ElementType.TYPE_USE)\n" +
+//			"@interface Foo {\n" +
+//			"}\n" +
+//			"@Retention(RetentionPolicy.CLASS)\n" +
+//			"@Target(ElementType.TYPE_USE)\n" +
+//			"@interface Bar {\n" +
+//			"        int iii() default -1;\n" +
+//			"}";
+//		
+//		String sourceNew =
+//				"import java.lang.annotation.*;\n" +
+//				"public class X<@Foo T1,@Bar(iii=100) T2> {}\n" +
+//				"@Retention(RetentionPolicy.CLASS)\n" +
+//				"@Target(ElementType.TYPE_USE)\n" +
+//				"@interface Foo {\n" +
+//				"}\n" +
+////				"@Retention(RetentionPolicy.CLASS)\n" +
+//				"@Target(ElementType.TYPE_USE)\n" +
+//				"@interface Bar {\n" +
+//				"        int iii() default -1;\n" +
+//				"}";
+//
+//		org.eclipse.jdt.internal.compiler.classfmt.ClassFileReader classFileReader = getInternalClassFile("", "X", "X", source);
+//		
+//
+//		IBinaryTypeAnnotation[] typeAnnotations = classFileReader.getTypeAnnotations();
+//		assertEquals(2,typeAnnotations.length);
+//		
+//		assertEquals("@LFoo; CLASS_TYPE_PARAMETER(type_parameter_index=0)", printTypeAnnotation(typeAnnotations[0]));
+//		assertEquals("@LBar;(iii=(int)99) CLASS_TYPE_PARAMETER(type_parameter_index=1)", printTypeAnnotation(typeAnnotations[1]));
+//	}
 
 	/**
 	 * Produce a nicely formatted type annotation for testing. Exercises the API for type annotations.

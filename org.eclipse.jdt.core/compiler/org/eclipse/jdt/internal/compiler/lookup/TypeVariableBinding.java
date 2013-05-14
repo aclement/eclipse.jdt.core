@@ -44,10 +44,17 @@ public class TypeVariableBinding extends ReferenceBinding {
 	public char[] genericTypeSignature;
 	LookupEnvironment environment;
 	
+	public AnnotationBinding[] typeAnnotations;
+	
 	public TypeVariableBinding(char[] sourceName, Binding declaringElement, int rank, LookupEnvironment environment) {
+		this(sourceName, declaringElement, rank, environment, null);
+	}
+	
+	public TypeVariableBinding(char[] sourceName, Binding declaringElement, int rank, LookupEnvironment environment, AnnotationBinding[] typeAnnotations) {
 		this.sourceName = sourceName;
 		this.declaringElement = declaringElement;
 		this.rank = rank;
+		this.typeAnnotations = typeAnnotations;
 		this.modifiers = ClassFileConstants.AccPublic | ExtraCompilerModifiers.AccGenericSignature; // treat type var as public
 		this.tagBits |= TagBits.HasTypeVariable;
 		this.environment = environment;
@@ -482,6 +489,10 @@ public class TypeVariableBinding extends ReferenceBinding {
 	
 	public ReferenceBinding[] superInterfaces() {
 		return this.superInterfaces;
+	}
+	
+	public AnnotationBinding[] getTypeAnnotations() {
+		return this.typeAnnotations;
 	}
 	
 	/**

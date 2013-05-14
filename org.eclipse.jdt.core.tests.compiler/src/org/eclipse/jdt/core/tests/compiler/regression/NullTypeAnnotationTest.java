@@ -19,6 +19,8 @@ import java.util.Map;
 import junit.framework.Test;
 
 import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
+import org.eclipse.jdt.internal.compiler.impl.CompilerOptions;
 
 public class NullTypeAnnotationTest extends AbstractNullAnnotationTest {
 
@@ -38,6 +40,12 @@ public class NullTypeAnnotationTest extends AbstractNullAnnotationTest {
 	"    TYPE_USE\n" +
 	"}\n";
 
+
+	// Needed to run tests individually from JUnit
+	protected void setUp() throws Exception {
+		super.setUp();
+		this.complianceLevel = ClassFileConstants.JDK1_8;
+	}
 
 
 	// FIXME (stephan): using CUSTOM_NULLABLE_CONTENT_JSR308 et al. throughout,
@@ -68,10 +76,17 @@ public class NullTypeAnnotationTest extends AbstractNullAnnotationTest {
 		Map customOptions = getCompilerOptions();
 		customOptions.put(JavaCore.COMPILER_NULLABLE_ANNOTATION_NAME, "org.foo.Nullable");
 		customOptions.put(JavaCore.COMPILER_NONNULL_ANNOTATION_NAME, "org.foo.NonNull");
+
+		customOptions.put(CompilerOptions.OPTION_Compliance, CompilerOptions.VERSION_1_8);
+		customOptions.put(CompilerOptions.OPTION_Source, CompilerOptions.VERSION_1_8);
+		customOptions.put(CompilerOptions.OPTION_TargetPlatform, CompilerOptions.VERSION_1_8);
 		runNegativeTest(
 			new String[] {
-				ELEMENT_TYPE_JAVA,
-				ELEMENT_TYPE_SOURCE,
+				"org/foo/MarkerX.java",
+				"import java.lang.annotation.*;\n" +
+				"@Retention(RetentionPolicy.RUNTIME) @Target(ElementType.TYPE_USE) @interface MarkerX {};\n",
+//				ELEMENT_TYPE_JAVA,
+//				ELEMENT_TYPE_SOURCE,
 				CUSTOM_NULLABLE_NAME,
 				CUSTOM_NULLABLE_CONTENT_JSR308,
 				CUSTOM_NONNULL_NAME,
@@ -80,9 +95,10 @@ public class NullTypeAnnotationTest extends AbstractNullAnnotationTest {
 				  "import org.foo.*;\n" +
 				  "import java.util.List;\n" +
 				  "public class X {\n" +
-				  "    void foo(List<@Nullable Object> l) {\n" +
+				  "    @MarkerX String foo(List<@Nullable Object> l) {\n" +
 				  "        System.out.print(l.get(0).toString()); // problem: retrieved element can be null\n" +
 				  "        l.add(null);\n" +
+				  "        return \"abc\";\n" +
 				  "    }\n" +
 				  "    void bar(java.util.List<@Nullable Object> l) {\n" +
 				  "        System.out.print(l.get(1).toString()); // problem: retrieved element can be null\n" +
@@ -95,7 +111,7 @@ public class NullTypeAnnotationTest extends AbstractNullAnnotationTest {
 			"	                 ^^^^^^^^\n" + 
 			"Potential null pointer access: The method get(int) may return null\n" + 
 			"----------\n" + 
-			"2. ERROR in X.java (at line 9)\n" + 
+			"2. ERROR in X.java (at line 10)\n" + 
 			"	System.out.print(l.get(1).toString()); // problem: retrieved element can be null\n" + 
 			"	                 ^^^^^^^^\n" + 
 			"Potential null pointer access: The method get(int) may return null\n" + 
